@@ -1,50 +1,40 @@
 const express = require('express');
-const Database = require('better-sqlite3');
 const cors = require('cors');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
-const db = new Database('products.db');
+
+const supabaseUrl = 'https://kwjtarqjswofzxwghvbv.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3anRhcnFqc3dvZnp4d2dodmJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwNjQxODAsImV4cCI6MjA5MzY0MDE4MH0.mJAtmaATNtJAqebN4oFzCobkArwcTwUl51chg2EsrG4';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 app.use(cors());
 app.use(express.json());
 
-db.exec(`
-    CREATE TABLE IF NOT EXISTS products (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        price INTEGER NOT NULL
-    )
-`);
-
-app.get('/products', (req, res) => {
-    const products = db.prepare('SELECT * FROM products').all();
-    res.json(products);
+app.get('/products', async (req, res) => {
+    const { data, error } = await supabase.from('products').select('*');
+    if (error) return res.json({ error });
+    res.json(data);
 });
 
-app.get('/products/:id', (req, res) => {
-    const product = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
-    if (!product) {
-        res.json({ message: 'Product not found!' });
-        return;
-    }
-    res.json(product);
-});
-
-app.post('/products', (req, res) => {
+app.post('/products', async (req, res) => {
     const { name, price } = req.body;
-    const result = db.prepare('INSERT INTO products (name, price) VALUES (?, ?)').run(name, price);
-    res.json({ message: 'Product added!', id: result.lastInsertRowid });
+    const { data, error } = await supabase.from('products').insert([{ name, price }]);
+    if (error) return res.json({ error });
+    res.json({ message: 'Product added!' });
 });
 
-app.put('/products/:id', (req, res) => {
-    const { name, price } = req.body;
-    db.prepare('UPDATE products SET name = ?, price = ? WHERE id = ?').run(name, price, req.params.id);
-    res.json({ message: 'Product updated!' });
-});
-
-app.delete('/products/:id', (req, res) => {
-    db.prepare('DELETE FROM products WHERE id = ?').run(req.params.id);
+app.delete('/products/:id', async (req, res) => {
+    const { error } = await supabase.from('products').delete().eq('id', req.params.id);
+    if (error) return res.json({ error });
     res.json({ message: 'Product deleted!' });
+});
+
+app.put('/products/:id', async (req, res) => {
+    const { name, price } = req.body;
+    const { error } = await supabase.from('products').update({ name, price }).eq('id', req.params.id);
+    if (error) return res.json({ error });
+    res.json({ message: 'Product updated!' });
 });
 
 app.listen(3000, () => {
